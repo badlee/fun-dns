@@ -1,0 +1,29 @@
+     _   _   _   _____   _____        _____   _____   _____         _____   _   _   __   _  
+    | | | | | | /  ___/ |_   _|      |  ___| /  _  \ |  _  \       |  ___| | | | | |  \ | | 
+    | | | | | | | |___    | |        | |__   | | | | | |_| |       | |__   | | | | |   \| | 
+ _  | | | | | | \___  \   | |        |  __|  | | | | |  _  /       |  __|  | | | | | |\   | 
+| |_| | | |_| |  ___| |   | |        | |     | |_| | | | \ \       | |     | |_| | | | \  | 
+\_____/ \_____/ /_____/   |_|        |_|     \_____/ |_|  \_\      |_|     \_____/ |_|  \_| 
+
+
+DNS in Nodejs
+
+How install
+
+	$ mkdir /opt/fun_dns
+	$ cd /opt/fun_dns
+	$ tar xvf /path/to/fun_dns.tar.gz
+	$ ln -s /opt/fun_dns/fun_dns /etc/init.d
+	$ update-rc.d fun_dns defaults
+	$ #Start service
+	$ service fun_dns start	
+
+How define hostname
+edit 'conf.ini', put
+[hostname]
+ip= your ip4 addresse
+
+Server confiurations(serv.ini)
+host = your ip4 addresse to listen(if not defined listen all)
+port = port to listen(if not defined listen 53)
+
