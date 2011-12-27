@@ -4,26 +4,128 @@
  _  | | | | | | \___  \   | |        |  __|  | | | | |  _  /       |  __|  | | | | | |\   | 
 | |_| | | |_| |  ___| |   | |        | |     | |_| | | | \ \       | |     | |_| | | | \  | 
 \_____/ \_____/ /_____/   |_|        |_|     \_____/ |_|  \_\      |_|     \_____/ |_|  \_| 
+                                                                             version 0.1.11
 
-
-DNS in Nodejs
+Fun DNS build on top of Nodejs
 
 How install
-
+	Run $ sudo setup.sh
+OR
+	$ sudo -s 
 	$ mkdir /opt/fun_dns
 	$ cd /opt/fun_dns
 	$ tar xvf /path/to/fun_dns.tar.gz
-	$ ln -s /opt/fun_dns/fun_dns /etc/init.d
+	$ ln -s /opt/fun_dns/fun_dns.daemon /etc/init.d/fun_dns
 	$ update-rc.d fun_dns defaults
 	$ #Start service
 	$ service fun_dns start	
 
 How define hostname
-edit 'conf.ini', put
-[hostname]
-ip= your ip4 addresse
+	edit 'config/conf.json',
+	the syntaxe of this file respect json format
+		{
+			"hostname1" : {
+				[property...]
+			},
+			"hostname2" : {
+				[property...]
+			},
+			"hostname3" : {
+				[property...]
+			},
+			[...]
+			"hostnameN" : {
+				[property...]
+			}
+		}
+	properties of a hostname
+		"name" : {
+			"ip" : "127.0.0.1",
+			"description" : "je suis le serveur web local",
+			"autority" : "dns.{name},dns2.{name}",
+			"mail" : {
+				"ip" : "127.0.0.2",
+				"name" : "mail.{name}",
+				"priority" : 10
+			},
+			"nameserver" : [{
+				"ip" : "127.0.0.1",
+				"name" : "ns1.{name}"
+			}]
+		}
+	The hostname can have a short regex like syntaxe.
+		*  : this expression respect ".*" in regex;
+		%w : this expression respect "[a-zA-Z0-9_]+" in regex;
+		%h : this expression respect "[a-fA-F0-9]+" in regex;
+		%d : this expression respect "[0-9]+" in regex;
 
-Server confiurations(serv.ini)
-host = your ip4 addresse to listen(if not defined listen all)
-port = port to listen(if not defined listen 53)
+	sample conf.json :
+		{
+			"server.web" : {
+				"ip" : "192.168.1.3",
+				"nameserver" : [{
+					"name" : "dns3.local.web"
+				},{
+					"ip" : "192.168.1.2",
+					"name" : "dns2.local.web"
+				},{
+					"ip" : "192.168.1.1",
+					"name" : "dns.local.web"
+				}]
+			},
+			"!*.lo" : {
+				"ip" : "127.0.0.1",
+				"autority" : "dns.{name},dns2.{name}",
+		
+				"nameserver" : [{
+					"ip" : "127.0.0.1",
+					"name" : "dns.{name}"
+				},{
+					"ip" : "127.0.0.1",
+					"name" : "dns2.{name}"
+				}]
+		
+			}
+		}
+
+Server confiurations(config/serv.ini)
+	conf = configuration hostname file(if not defined is set to app://config/conf.json)
+	host = your ip4 addresse to listen(if not defined listen all)
+	port = port to listen(if not defined listen 53)
+	Section nameserver = list of dns server used to found response when no response found on server(as a proxy, but it's eprouve the global performances)
+		[nameserver] 
+		nameOfTheDnsServer1 = Ip_Address
+		nameOfTheDnsServer2 = Ip_Address
+		...
+		nameOfTheDnsServer3 = Ip_Address
+
+	sample serv.ini:
+		conf = app://config/lab.json
+		port = 53
+		host = 192.168.1.1
+		[nameserver]
+		google.dns.a = 8.8.8.8
+		google.dns.b = 8.8.4.4
+
+
+
+Command line option
+	Usage:
+		fun_dns [options]
+	Options:
+	---	-p|--port <value>  
+			port to listen.
+	---	-h|--host <value>  
+			host to bind.
+	---	-c|--conf <value>  
+			configuration file(hostname).
+	---	-s|--servConf <value>
+			configuration file(server).
+	---	-v|--version       
+			Get the version of fun_dns
+	---	-z|--zone <value>  
+			Lookup a zoneWalk
+	---	-l|--log <value>  
+			path to log file
+
 

@@ -1,0 +1,37 @@
+{
+	"www.google.ga" : {
+		"ip" : "127.0.0.1",
+		"description" : "serveur google au gabon",
+	},
+	"!*.lo" : {
+		"ip" : "127.0.0.1",
+		"description" : "je suis le serveur local",
+		"autority" : "dns.{name},dns2.{name}",
+		"mail" : {
+			"ip" : "127.0.0.2",
+			"name" : "mail.{name}",
+			"priority" : 10
+		},
+		"nameserver" : [{
+			"ip" : "127.0.0.1",
+			"name" : "ns1.{name}"
+		}]
+	},
+	"local.osh" : {
+		"ip" : "127.0.0.1",
+		"description" : "je suis le serveur local",
+		"autority" : "dns.{name},dns2.{name}",
+		"mail" : {
+			"ip" : "127.0.0.2",
+			"name" : "mail.{name}",
+			"priority" : 10
+		},
+		"nameserver" : [{
+			"ip" : "127.0.0.1",
+			"name" : "ns1.{name}"
+		},{
+			"ip" : "127.0.0.1",
+			"name" : "dns1.{name}"
+		}]
+	}
+}

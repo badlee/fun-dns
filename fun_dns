@@ -1,285 +1,466 @@
-#! /bin/sh
-# ------------------------------------------------------------------------------ 
-# SOME INFOS : fairly standard (debian) init script.
-#                 Note that node doesn't create a PID file (hence --make-pidfile) 
-#                 has to be run in the background (hence --background)
-#                 and NOT as root (hence --chuid)
-#
-# MORE INFOS :  INIT SCRIPT       http://www.debian.org/doc/debian-policy/ch-opersys.html#s-sysvinit
-#               INIT-INFO RULES   http://wiki.debian.org/LSBInitScripts
-#               INSTALL/REMOVE    http://www.debian-administration.org/articles/28
-# ------------------------------------------------------------------------------
-#                                                                              #
-#                     BEGIN <MODIFY TO REFLECT YOUR SETTINGS>                  #
-#                                                                              #
-#
-#  1) Don't forget to also modify the COMMENTED fields in the "### BEGIN INIT INFO"
-#     below (don't uncomment them) if you wish to install system-wide with update-rc.d
-#     eg: provides, Short-Description, Description
-#
-#  2) in case you have different node.js servers running, each init.d script should
-#     (obviously) have a UNIQUE BASE name so that PIDS do not conflict
-#     --> name them accordingly
-#     eg: node_static_server, node_express1, node_load_balancer.sh...
-#
-#  3) copy the renamed/modified script(s) to /etc/init.d
-#     chmod 755,
-#
-#  4) if you wish the Daemon to be lauched at boot / stopped at shutdown :
-#     INSTALL : update-rc.d scriptname defaults 
-#     (UNINSTALL : update-rc.d -f  scriptname remove)
-#
-#  5)  based on : Debian /etc/init.d/skeleton
-#      modified by : Peter Host (www.oghme.com)
-# ______________________________________________________________________________ 
+#!bin/node
+/*
 
-### BEGIN INIT INFO
-# Provides:          node_debian_init
-# Required-Start:    $remote_fs $named $syslog
-# Required-Stop:     $remote_fs $named $syslog
-# Default-Start:     2 3 4 5
-# Default-Stop:      0 1 6
-# Short-Description: DNS server is just for fun
-# Description:       DNS serer non authorative
-#                    Protocol UDP, port 53
-#					 IP Support only ip4
-#                    Place this file in /etc/init.d.
-### END INIT INFO
+											|¯\ |\| |¯    | | |¯| |¯  ¯|¯   |\| /¯\ |\/| |¯
+											|_/ | |  ¯|   |¯| |_|  ¯|  |    | | |¯| |  | |¯
+     _   _   _   _____   _____        _____   _____   _____         _____   _   _   __   _  
+    | | | | | | /  ___/ |_   _|      |  ___| /  _  \ |  _  \       |  ___| | | | | |  \ | | 
+    | | | | | | | |___    | |        | |__   | | | | | |_| |       | |__   | | | | |   \| | 
+ _  | | | | | | \___  \   | |        |  __|  | | | | |  _  /       |  __|  | | | | | |\   | 
+| |_| | | |_| |  ___| |   | |        | |     | |_| | | | \ \       | |     | |_| | | | \  | 
+\_____/ \_____/ /_____/   |_|        |_|     \_____/ |_|  \_\      |_|     \_____/ |_|  \_| 
 
-# Author: Badlee Oshimin <badlee.oshimin@gmail.com>
-#
-# Please remove the "Author" lines above and replace them
-# with your own name if you copy and modify this script.
-# ______________________________________________________________________________ 
-#
-# PATH should only include /usr/* if it runs after the mountnfs.sh script
-PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin # modify if you need
-
-DIRFOLDER="/opt/fun_dns"
-PROGEXEC="index.js"
-DAEMON_ARGS=$DIRFOLDER/$PROGEXEC               # path to your node.js server/app
-                                            # NB: don't use ~/ in path
-
-DESC="Little Javascript DNS Server for resolve internet's hostname only"            # whatever fancy description you like
-
-NODEUSER=root:root 		                    # USER who OWNS the daemon process (no matter whoever runs the init script)
-                                            # user:group (if no group is specified, the primary GID for that user is used)
-
-LOCAL_VAR_RUN=var/run            # in case the init script is run by non-root user, you need to
-                                            # indicate a directory writeable by $NODEUSER to store the PID file
-                                            # NB : 1) /usr/local/var/run does not exist by DEFAULT. Either create it
-                                            #      or choose one of your own liking.
-                                            #      2) node, npm,... are best NOT installed/run as ROOT.
-                                            #         (see here: https://github.com/isaacs/npm/blob/master/README.md)
-
-NAME=node                                   # name of the node.js executable
-DAEMON=$DIRFOLDER/$NAME                 # this SHOULD POINT TO where your node executable is
-#
-#                                                                              #
-#                   END </MODIFY TO REFLECT YOUR SETTINGS>                     #
-#                (Nothing else to modify from this point on...)                #
-# ------------------------------------------------------------------------------ 
+*/
+// Copyright (c) 2011 Badlee Oshimin
+//
+//			badlee.oshimin[at]gmail[dot]com
+//			github.com/badlee
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+//
 
 
+process.path = process.argv[0];
+process.argv.shift();
 
+var sys = require('util'),
+	puts = sys.puts,
+	ini = require('parser.js'),
+	ndns = require('ndns.js'),
+	uri = require('url'),
+	fs = require('fs');
+	console = require('console.js');
+	require('_extend.js');
+function appProtocol(a,dir){
+	var url = uri.parse(a.toLowerCase());
+	if(url.protocol ===  "app:")
+		a = a.replace("app:/",dir||__dirname);
+	return a;
+};
+var UpdateConfFile = null;
+function parseUrl (url) {
+    // TODO: Add support for ftp username
+    var p = {}, m;
+    if (m = url.match(/((\w+):\/\/)?([^\/:]+)?(:([0-9]+))?([^\?#]+)?(\?([^#]+))?(#(.+))?/)) {
+        p['scheme'] = m[2]|| null;
+        p['host']   = m[3]|| null;
+        p['port']   = m[5]|| null;
+        p['path']   = m[6]|| null;
+        p['args']   = m[8]|| {};
+        p['anchor'] = m[10] || null;
+        return p;
+    }
 
-
-# Do NOT "set -e"
-
-#[ $UID -eq "0" ] && LOCAL_VAR_RUN=/var/run # in case this script is run by root, override user setting
-# we need root to run 
-if test "`id -u`" -ne 0
-then
-	echo "You need to start FUN DNS as root!"
-	exit
-fi
-THIS_ARG=$0
-INIT_SCRIPT_NAME=`basename $THIS_ARG`
-[ -h $THIS_ARG ] && INIT_SCRIPT_NAME=`basename $(readlink $THIS_ARG)` # in case of symlink
-INIT_SCRIPT_NAME_NOEXT=${INIT_SCRIPT_NAME%.*}                            
-PIDFILE="$LOCAL_VAR_RUN/$INIT_SCRIPT_NAME_NOEXT.pid"
-SCRIPTNAME=/etc/init.d/$INIT_SCRIPT_NAME
-
-# Exit if the package is not installed
-[ -x "$DAEMON" ] ||  { echo "can't find Node.js ($DAEMON)"  >&2; exit 0; }
-
-# Exit if the 'run' folder is not present
-[ -d "$LOCAL_VAR_RUN" ] || { echo "Directory $LOCAL_VAR_RUN does not exist. Modify the '$INIT_SCRIPT_NAME_NOEXT' init.d script ($THIS_ARG) accordingly" >&2; exit 0; }
-
-# Read configuration variable file if it is present
-[ -r /etc/default/$INIT_SCRIPT_NAME ] && . /etc/default/$INIT_SCRIPT_NAME
-
-# Load the VERBOSE setting and other rcS variables
-. /lib/init/vars.sh
-
-# Define LSB log_* functions.
-# Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
-. /lib/lsb/init-functions
-
-# uncomment to override system setting
-# VERBOSE=yes
-
-#
-# Function that starts the daemon/service
-#
-do_start()
-{
-	# Return
-	#   0 if daemon has been started
-	#   1 if daemon was already running
-	#   2 if daemon could not be started
-	start-stop-daemon --start --quiet --pidfile $PIDFILE --chuid $NODEUSER --background --exec $DAEMON --test > /dev/null \
-		|| { [ "$VERBOSE" != no ] && log_daemon_msg  "  --->  Daemon already running $DESC" "$INIT_SCRIPT_NAME_NOEXT"; return 1; }
-	start-stop-daemon --start --quiet --chuid $NODEUSER --make-pidfile --pidfile $PIDFILE --background --exec $DAEMON -- \
-		$DAEMON_ARGS \
-		|| { [ "$VERBOSE" != no ] && log_daemon_msg  "  --->  could not be start $DESC" "$INIT_SCRIPT_NAME_NOEXT"; return 2; }
-	# Add code here, if necessary, that waits for the process to be ready
-	# to handle requests from services started subsequently which depend
-	# on this one.  As a last resort, sleep for some time.
-	[ "$VERBOSE" != no ] && log_daemon_msg  "  --->  started $DESC" "$INIT_SCRIPT_NAME_NOEXT"
+    return false;
 }
 
-#
-# Function that stops the daemon/service
-#
-do_stop()
-{
-	# Return
-	#   0 if daemon has been stopped
-	#   1 if daemon was already stopped
-	#   2 if daemon could not be stopped
-	#   other if a failure occurred
-	start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE  --chuid $NODEUSER --name $DAEMON
-	RETVAL="$?"
-	#[ "$VERBOSE" != no ] && [ "$RETVAL" = 1 ] && log_daemon_msg  "  --->  SIGKILL failed => hardkill $DESC" "$INIT_SCRIPT_NAME_NOEXT"
-	[ "$RETVAL" = 2 ] && return 2
-	# Wait for children to finish too if this is a daemon that forks
-	# and if the daemon is only ever run from this initscript.
-	# If the above conditions are not satisfied then add some other code
-	# that waits for the process to drop all resources that could be
-	# needed by services started subsequently.  A last resort is to
-	# sleep for some time.
-	start-stop-daemon --stop --quiet --oknodo --retry=0/3/KILL/5 --pidfile $PIDFILE  --chuid $NODEUSER --exec $DAEMON -- $DAEMON_ARGS
-	[ "$?" = 2 ] && return 2
-	# Many daemons don't delete their pidfiles when they exit.
-	rm -f $PIDFILE
-  [ "$VERBOSE" != no ] && [ "$RETVAL" = 1 ] && log_daemon_msg "  --->  $DESC not running" "$INIT_SCRIPT_NAME_NOEXT"
-  [ "$VERBOSE" != no -a "$RETVAL" = 0 ] && log_daemon_msg "  --->  $DESC stopped" "$INIT_SCRIPT_NAME_NOEXT"
-	return "$RETVAL"
-}
+var findZone = false;
+var fun_dns = [
+	0,/*Majeur*/
+	1,/*Mineur*/
+	10, /*Build*/
+	'release' /*state*/
+];
+;
+process.version = process.versions.fun_dns = fun_dns.join(".");
+var options = require("options")([
+		['p', 'port', ':', "Port d'ecoute du serveur." ],
+		['h', 'host', ':', "Port d'ecoute du serveur." ],
+		['c', 'conf',    ':', 'Fichier de configuration(hostname).'],
+		['s', 'servConf', ':', "Fichier de configuration(serveur)." ],
+		['l', 'log' , ':', "Fichier de log"],
+		['v', 'version', '',  "Obtention de la version",function(){
+			console.log("fun_dns-"+process.versions.fun_dns);
+			process.exit();
+		}],
+		['z',"zone",':',"Obtention d'une zoneWalk",function(zone){
+			var walk = function (a_root_servers_net, domain) {
+				var resolver = ndns.createClient('udp4');
+				puts(domain);
+				var req = resolver.request(53, a_root_servers_net);
 
-#
-# Function that sends a SIGHUP to the daemon/service
-#
-do_reload() {
-	#
-	# If the daemon can reload its configuration without
-	# restarting (for example, when it is sent a SIGHUP),
-	# then implement that here.
-	#
-	start-stop-daemon --stop --quiet --signal 1 --pidfile $PIDFILE  --chuid $NODEUSER --name $NAME
-	return 0
-}
+				req.setHeader({
+				id: 1992,
+				rd: 1,
+				qdcount: 1});
+				req.addQuestion (domain, "NSEC", "IN");
+				req.send();
 
-#
-# Function that returns the daemon 
-#
-do_status() {
-  #
-  # http://refspecs.freestandards.org/LSB_3.1.1/LSB-Core-generic/LSB-Core-generic/iniscrptact.html
-  # 0 program is running or service is OK
-  # 1 program is dead and /var/run pid file exists
-  # (2 program is dead and /var/lock lock file exists) (not used here)
-  # 3 program is not running
-  # 4 program or service status is unknown
-  RUNNING=$(running)
-  
-  # $PIDFILE corresponds to a live $NAME process
-  ispidactive=$(pidof $NAME | grep `cat $PIDFILE 2>&1` >/dev/null 2>&1)
-  ISPIDACTIVE=$?
+				req.on("response", function (res) {
+				var rr;
+				for (var i = 0; i < res.rr.length; i++) {
+					rr = res.rr[i];
+					if (rr.typeName == "NSEC") {
+					walk(a_root_servers_net, rr.rdata.next_domain_name);
+					break;
+					}
+				}
+				});
+			}
 
-  if [ -n "$RUNNING" ]; then
-    if [ $ISPIDACTIVE ]; then 
-      log_success_msg "$INIT_SCRIPT_NAME_NOEXT (launched by $USER) (--chuid $NODEUSER) is running"
-      exit 0      
-    fi
-  else
-    if [ -f $PIDFILE ]; then
-      log_success_msg "$INIT_SCRIPT_NAME_NOEXT (launched by $USER) (--chuid $NODEUSER) is not running, phantom pidfile $PIDFILE"
-      exit 1
-    else
-      log_success_msg "no instance launched by $USER, of $INIT_SCRIPT_NAME_NOEXT (--chuid $NODEUSER) found"
-      exit 3
-    fi
-  fi
-  
-}
+			require('dns').resolve4(zone, function (err, addrs) {
+				if (err){
+					console.error("Error", err);
+					process.exit();
+				};
+				if (addrs.length > 0)
+				walk(addrs[0], ".");
+				process.exit();
+			});
+		}]
+	],{
+		script : "fun_dns",
+		values : '',
+		desc :
+"     _   _   _   _____   _____        _____   _____   _____         _____   _   _   __   _\n"+ 
+"    | | | | | | /  ___/ |_   _|      |  ___| /  _  \\ |  _  \\       |  ___| | | | | |  \\ | |\n"+ 
+"    | | | | | | | |___    | |        | |__   | | | | | |_| |       | |__   | | | | |   \\| |\n"+ 
+" _  | | | | | | \\___  \\   | |        |  __|  | | | | |  _  /       |  __|  | | | | | |\\   |\n"+ 
+"| |_| | | |_| |  ___| |   | |        | |     | |_| | | | \\ \\       | |     | |_| | | | \\  |\n"+ 
+"\\_____/ \\_____/ /_____/   |_|        |_|     \\_____/ |_|  \\_\\      |_|     \\_____/ |_|  \\_|\n"+
+"                                      Fun DNS  est un serveur DNS ecrit au dessus de nodejs\n"
+	});
 
-running() {
-  RUNSTAT=$(start-stop-daemon --start --quiet --pidfile $PIDFILE --chuid $NODEUSER --background --exec $DAEMON --test > /dev/null)
-  if [ "$?" = 1 ]; then
-    echo y
-  fi
-  
-}
+var conf;
+servConfig = options.servConf || "app://config/serv.ini";
+PROXY = [];
+NAMES = {};
 
+console.setLog(options.log || "/var/log/fun_dns.log");
 
-case "$1" in
-  start)
-	[ "$VERBOSE" != no ] && log_daemon_msg "Starting $DESC" "$INIT_SCRIPT_NAME_NOEXT"
-	do_start
-	case "$?" in
-		0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
-		2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
-	esac
-	;;
-  stop)
-	[ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$INIT_SCRIPT_NAME_NOEXT"
-	do_stop
-	case "$?" in
-		0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
-		2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
-	esac
-	;;
-  #reload|force-reload)
-	#
-	# If do_reload() is not implemented then leave this commented out
-	# and leave 'force-reload' as an alias for 'restart'.
-	#
-	#log_daemon_msg "Reloading $DESC" "$NAME"
-	#do_reload
-	#log_end_msg $?
-	#;;
-  restart|force-reload)
-	#
-	# If the "reload" option is implemented then remove the
-	# 'force-reload' alias
-	#
-	log_daemon_msg "Restarting $DESC" "$INIT_SCRIPT_NAME_NOEXT"
-	do_stop
-	case "$?" in
-	  0|1)
-		do_start
-		case "$?" in
-			0) log_end_msg 0 ;;
-			1) log_end_msg 1 ;; # Old process is still running
-			*) log_end_msg 1 ;; # Failed to start
-		esac
-		;;
-	  *)
-	  	# Failed to stop
-		log_end_msg 1
-		;;
-	esac
-	;;
-  status)
-    do_status
-  ;;
-  *)
-	#echo "Usage: $SCRIPTNAME {start|stop|restart|reload|force-reload}" >&2
-	echo "Usage: $SCRIPTNAME {start|stop|restart|force-reload}" >&2
-	exit 3
-	;;
-esac
+if(!findZone){
+	var dgram = require('dgram');
+	var server = ndns.createServer('udp4');
+	var client = ndns.createClient('udp4');
 
-exit 0
+	var CACHE_DNS = {};
+	var proxy = function(req,res,name,i){
+		if(CACHE_DNS[name]){
+			res.setHeader(req.header);
+			//CACHE_DNS[name].header = req.header;
+			for (var i = 0; i < req.q.length; i++)
+				res.addQuestion(req.q[i]);
+			
+			res.header.qr = CACHE_DNS[name].header.qr;
+			res.header.ra = CACHE_DNS[name].header.ra;
+			res.header.rd = CACHE_DNS[name].header.rd;
+
+			/* Nombre de reponse */
+			res.header.ancount = CACHE_DNS[name].header.ancount;
+			/* Nombre de namespace */
+			res.header.nscount = CACHE_DNS[name].header.nscount;
+			/* Nombre de reponse aditionnel */
+			res.header.arcount = CACHE_DNS[name].header.arcount;
+
+			res.rr = CACHE_DNS[name].rr;
+			
+			res.send();
+			console.info("Found",name,"on Cache data");
+			return;
+		};
+		i = i || 0;
+		if(!PROXY.length){
+			res.send(res);
+			console.warn("Not found",name,": Proxies list is empty");
+			return;
+		};
+		
+		var c_req = client.request(PROXY[i].port||53, PROXY[i].host);
+		
+		c_req.on("response", function (c_res) {
+			try{
+				clearTimeout(this.timeout);
+				if((c_res.header.ancount+c_res.header.nscount+c_res.header.arcount)){
+					res.send(c_res);
+					console.info("Found",name,"on", PROXY[i].host+":"+(PROXY[i].port||53));
+					CACHE_DNS[name] = c_res;
+					setTimeout((function(name){
+						CACHE_DNS[name]=false;
+					}).bind(null,name),1000*60*60);
+				}else{
+					console.info("\tNot Found", name ," on this DNS : ", PROXY[i].host+":"+(PROXY[i].port||53));
+					if(++i<PROXY.length){
+						proxy(req,res,name,i);
+					}else{
+						res.send(c_res);
+						console.warn("Not found",name,"on all proxies");
+					}
+				}
+			}catch(e){};
+		});
+		c_req.send(req);
+		
+		c_req.timeout  = setTimeout((function(name){
+			console.info("\tRequest",name,"Timeout on : ", PROXY[i].host+":"+(PROXY[i].port||53));
+			//try{this.socket.close();}catch(e){};
+			if(++i<PROXY.length){
+				proxy(req,res,name,i);
+			}else{
+				res.send(res);
+				console.warn("Not found",name,"on all proxies");
+			}
+		}).bind(c_req,name),1500);
+		console.info("\tTry DNS ", PROXY[i].host+":"+(PROXY[i].port||53));
+	};
+	var getRecords = function(data,name){
+		var ret = {
+			REP : [],
+			NS  : [],
+			ADD : []
+		};
+		var i=0;
+		var j,k=0;
+		for(i in data){
+			j = String(data[i]).replace(/{name}/g,name);
+			switch(i.toLowerCase()){
+				case 'ip':
+					/* adresse IP */
+					data[i] = data[i] instanceof Array ? data[i] : [data[i]];
+					data[i].rotate(1);
+					for(var x=0; x< data[i].length;x++)
+						ret.REP.push([name,77, "IN", "A", data[i][x]]);
+					break;
+				case 'description':
+					ret.REP.push([name, 86400, "IN", "TXT", data[i]]);
+					break;
+				case 'autority':
+					data[i] = String(j).split(',').slice(0,2);
+					data[i] = data[i].length ==1 ? data[i].concat(data[i]) : data[i]; 
+					ret.REP.push([name, 86400, "IN", "SOA"].concat(data[i]).concat([UpdateConfFile,1800, 900, 604800, 86400]));
+					break;
+				case 'mail':
+					data[i] = data[i] instanceof Array ? data[i] : [data[i]];
+					var k = 0;
+					for(j = 0;j< data[i].length;j++){
+						data[i].name = data[i][j].name? data[i].name.replace(/{name}/g,name) : "mail."+name;
+						ret.REP.push([name, 86400, "IN", "MX", data[i][j].priority || (++k)*10, data[i][j].name]);
+						if(data[i][j].ip){
+							data[i][j].ip = data[i][j].ip instanceof Array ? data[i][j].ip : [data[i][j].ip];
+							data[i][j].ip.rotate(1);
+							for(var x=0; x< data[i][j].ip.length;x++)
+								ret.ADD.push([data[i][j].name, 77, "IN", "A", data[i][j].ip[x]]);
+						}
+					}
+					break;
+				case 'nameserver':
+					for(j = 0;j< data[i].length;j++){
+						data[i][j].name = data[i][j].name? data[i][j].name.replace(/{name}/g,name) : "ns"+(++k++)+"."+name;
+						ret.NS.push([name, 86400, "IN", "NS" , data[i][j].name]);
+						if(data[i][j].ip){
+							data[i][j].ip = data[i][j].ip instanceof Array ? data[i][j].ip : [data[i][j].ip];
+							data[i][j].ip.rotate(1);
+							for(var x=0; x< data[i][j].ip.length;x++)
+								ret.ADD.push([data[i][j].name, 77, "IN", "A", data[i][j].ip[x]]);
+						};
+					}
+					break;
+				
+				case 'alias':
+					for(j = 0;j< data[i].length;j++){
+						data[i][j].name = data[i][j].name? data[i][j].name.replace(/{name}/g,name) : "ns"+(++k++)+"."+name;
+						ret.REP.push([name, 86400, "IN", "CNAME" , data[i][j].name]);
+						if(data[i][j].ip){
+							data[i][j].ip = data[i][j].ip instanceof Array ? data[i][j].ip : [data[i][j].ip];
+							data[i][j].ip.rotate(1);
+							for(var x=0; x< data[i][j].ip.length;x++)
+								ret.REP.push([data[i][j].name, 77, "IN", "A", data[i][j].ip[x]]);
+						};
+					}
+					break;
+			}
+		}
+		return ret;
+	};
+	server.on("request", function(req, res) {
+		if (req.q.length > 0) {
+			var name = req.q[0].name;
+			if (name == ".")
+				name = "";
+			/* Test le nom */
+			//find info dns here
+			var rec;
+			if(NAMES && NAMES[name]){
+			    rec = getRecords(NAMES[name],name);
+			}else{
+				if(NAMES){
+			   		for(i in NAMES){
+				   		if(i.search(/\!/) != 0) continue;	
+				   		t = i
+				   			.replace("!","")
+                            .replace(/\./g,"\\.")
+                            .replace("*",".*")
+                            .replace("%w","[a-zA-Z0-9_]+")
+                            .replace("%d","[0-9]+")
+                            .replace("%h","[a-fA-F0-9]+");
+			   			t = new RegExp("^"+t+"$");
+			   			if(t.test(name)){
+			   				console.info("Found",t,"in",name);
+			   				rec = getRecords(NAMES[i],name);
+			   			}
+			   			t = '';
+			   		}
+			   	}
+			}
+			/* ** */
+			if(!rec){
+				console.warn("Not found",name,"on this server, try to use proxy");
+				proxy(req,res,name);
+				return;
+			}
+			
+			res.setHeader(req.header);	
+			for (var i = 0; i < req.q.length; i++)
+				res.addQuestion(req.q[i]);
+			
+			res.header.qr = 1;
+			res.header.ra = 1;
+			res.header.rd = 0;
+			
+			/* Nombre de reponse */
+			res.header.ancount = rec.REP.length;
+			/* Nombre de namespace */
+			res.header.nscount = rec.NS.length;
+			/* Nombre de reponse aditionnel */
+			res.header.arcount = rec.ADD.length;
+			/* ajout des reponses */
+			var j = 1;
+			for(var i=0;i<rec.REP.length;i++){
+				res.addRR.apply(res,rec.REP[i]);
+			}
+			
+			/* ajout des NS */
+			for(var i=0;i<rec.NS.length;i++){
+				res.addRR.apply(res,rec.NS[i]);
+			}
+			
+			/* ajout des ADD */
+			for(var i=0;i<rec.ADD.length;i++){
+				res.addRR.apply(res,rec.ADD[i]);
+			}
+			
+		}else{
+			res.setHeader(req.header);	
+			for (var i = 0; i < req.q.length; i++)
+				res.addQuestion(req.q[i]);
+		};
+		res.send();
+	});
+	var loadConf = function(conf){
+		try{
+			console.info("LOAD Config Domain name");
+			conf = JSON.parse(conf);
+			NAMES = conf;
+			console.info("\tConfig loaded");
+		}catch(e){
+			console.error("\tError on decode Config",e.stack,"#",conf,"#");
+		}
+		console.info("End LOAD Config");
+	}
+	/* function for load server */
+	var loadDataServer = function(serv,proxyOnly){
+		serv.nameserver = serv.nameserver.length ? serv.nameserver[0] : [];
+		  
+		  PROXY =  [];
+		  console.info("LOAD DNS Server");
+		  for(i in serv.nameserver){
+		  	if(typeof serv.nameserver[i] == "string"){
+		  		console.info("\tADD DNS Server",serv.nameserver[i]);
+			  	PROXY.push(parseUrl(String(serv.nameserver[i])));
+			}
+		  }
+		  if(PROXY.length)
+		  	console.info(PROXY.length+" DNS Server added");
+		  else
+		  	console.info("No DNS Server to add");
+		  if(Boolean(proxyOnly))return;
+		  /*define config page*/
+		  conf = options.conf || serv.conf || "app://config/conf.json";
+		  conf = appProtocol(conf);
+		  fs.readFile(conf, function (err, data) {
+			  if (err){
+			  	console.error('Fatal Error : Can\'t read Config at ' + conf );
+			  	process.exit(1);
+			  };
+			
+			  UpdateConfFile = fs.statSync(conf).mtime.format("Ymd11");
+			  loadConf(String(data));
+			  fs.watchFile(conf, function (curr, prev) {
+					fs.readFile(conf, function (err, data) {
+						if (err){
+						  	console.error('Can\'t read Config at ' + conf );
+						  	return;
+						  };
+						loadConf(String(data));
+					});
+				});
+				
+			  serv = {
+				host : options.host || serv.host || null,
+				port : options.port || serv.port || 53
+			  };
+			  serv.port = Number(serv.port);
+			  if(serv.host && serv.host != 0){
+				  server.bind(serv.port, serv.host);
+				  console.info('Started server on ' + serv.host + ':' + serv.port);
+			  }else{
+			  	server.bind(serv.port);
+			  	console.info('Started server on *:' + serv.port);
+			  }
+			});
+		  /* ** */
+	}
+	/* ** */
+	/* function pour */
+	/* ** */
+	servConfig = appProtocol(servConfig);
+	fs.readFile(servConfig, function (err, data) {
+	  if (err){
+	  	console.error('Fatal Error : Can\'t read Config server at ' + servConfig );
+	  	process.exit(1);
+	  };
+	  loadDataServer(ini.parseString(String(data),true));
+	  fs.watchFile(servConfig, function (curr, prev) {
+			fs.readFile(servConfig, function (err, data) {
+				if (err){
+				  	console.error('Can\'t read Config server at ' + servConfig );
+				  	return;
+				  };
+				loadDataServer(ini.parseString(String(data),true),true);
+			});
+		});
+	});
+};
+
+process.on('uncaughtException', function (err) {
+  console.error("Erreur",":", err.code || err.stack || err);
+  if(err.code){
+  	switch(err.code){
+  		case 'EADDRNOTAVAIL':
+  			console.error("\tL'adresse n'est pas disponible!");
+  			break;
+  		case 'EADDRINUSE':
+  			console.error("\tLe port est deja utilise!");
+  			break;
+  		case 'EACCES':
+  			console.error("\tVerifier vos droits!");
+  			break;
+  	}
+  	process.exit();
+  };
+});
