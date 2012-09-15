@@ -73,7 +73,7 @@ var findZone = false;
 var fun_dns = [
 	0,/*Majeur*/
 	1,/*Mineur*/
-	11, /*Build*/
+	12, /*Build*/
 	'release' /*state*/
 ];
 
