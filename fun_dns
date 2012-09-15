@@ -1,8 +1,7 @@
-#!bin/node
+#!/usr/local/bin/node
 /*
-
-											|¯\ |\| |¯    | | |¯| |¯  ¯|¯   |\| /¯\ |\/| |¯
-											|_/ | |  ¯|   |¯| |_|  ¯|  |    | | |¯| |  | |¯
+    |¯\ |\| |¯    | | |¯| |¯  ¯|¯   |\| /¯\ |\/| |¯
+    |_/ | |  ¯|   |¯| |_|  ¯|  |    | | |¯| |  | |¯
      _   _   _   _____   _____        _____   _____   _____         _____   _   _   __   _  
     | | | | | | /  ___/ |_   _|      |  ___| /  _  \ |  _  \       |  ___| | | | | |  \ | | 
     | | | | | | | |___    | |        | |__   | | | | | |_| |       | |__   | | | | |   \| | 
@@ -45,8 +44,8 @@ var sys = require('util'),
 	ndns = require('ndns.js'),
 	uri = require('url'),
 	fs = require('fs');
-	console = require('console.js');
-	require('_extend.js');
+CONSOLE = require('console.js');
+require('_extend.js');
 function appProtocol(a,dir){
 	var url = uri.parse(a.toLowerCase());
 	if(url.protocol ===  "app:")
@@ -74,10 +73,10 @@ var findZone = false;
 var fun_dns = [
 	0,/*Majeur*/
 	1,/*Mineur*/
-	10, /*Build*/
+	11, /*Build*/
 	'release' /*state*/
 ];
-;
+
 process.version = process.versions.fun_dns = fun_dns.join(".");
 var options = require("options")([
 		['p', 'port', ':', "Port d'ecoute du serveur." ],
@@ -86,10 +85,11 @@ var options = require("options")([
 		['s', 'servConf', ':', "Fichier de configuration(serveur)." ],
 		['l', 'log' , ':', "Fichier de log"],
 		['v', 'version', '',  "Obtention de la version",function(){
-			console.log("fun_dns-"+process.versions.fun_dns);
+			CONSOLE.log("fun_dns-"+process.versions.fun_dns);
 			process.exit();
 		}],
 		['z',"zone",':',"Obtention d'une zoneWalk",function(zone){
+			findZone = true;
 			var walk = function (a_root_servers_net, domain) {
 				var resolver = ndns.createClient('udp4');
 				puts(domain);
@@ -116,7 +116,7 @@ var options = require("options")([
 
 			require('dns').resolve4(zone, function (err, addrs) {
 				if (err){
-					console.error("Error", err);
+					CONSOLE.error("Error", err);
 					process.exit();
 				};
 				if (addrs.length > 0)
@@ -141,8 +141,16 @@ var conf;
 servConfig = options.servConf || "app://config/serv.ini";
 PROXY = [];
 NAMES = {};
+TTL =  {
+	ttl : 600,
+	ip : 77,
+	refresh : 1800,
+	retry : 900,
+	expiration : 604800
+};
+SPF = 'v=spf1 +mx -all';
 
-console.setLog(options.log || "/var/log/fun_dns.log");
+CONSOLE.setLog(options.log || "/var/log/fun_dns.log");
 
 if(!findZone){
 	var dgram = require('dgram');
@@ -171,13 +179,13 @@ if(!findZone){
 			res.rr = CACHE_DNS[name].rr;
 			
 			res.send();
-			console.info("Found",name,"on Cache data");
+			CONSOLE.info(req.remoteAdrr(),"Found",name,"on Cache data");
 			return;
 		};
 		i = i || 0;
 		if(!PROXY.length){
 			res.send(res);
-			console.warn("Not found",name,": Proxies list is empty");
+			CONSOLE.warn("Not found",name,": Proxies list is empty");
 			return;
 		};
 		
@@ -188,18 +196,18 @@ if(!findZone){
 				clearTimeout(this.timeout);
 				if((c_res.header.ancount+c_res.header.nscount+c_res.header.arcount)){
 					res.send(c_res);
-					console.info("Found",name,"on", PROXY[i].host+":"+(PROXY[i].port||53));
+					CONSOLE.info("Found",name,"on", PROXY[i].host+":"+(PROXY[i].port||53));
 					CACHE_DNS[name] = c_res;
 					setTimeout((function(name){
 						CACHE_DNS[name]=false;
-					}).bind(null,name),1000*60*60);
+					}).bind(null,name),1000*60*60*60);
 				}else{
-					console.info("\tNot Found", name ," on this DNS : ", PROXY[i].host+":"+(PROXY[i].port||53));
+					CONSOLE.info("\tNot Found", name ," on this DNS : ", PROXY[i].host+":"+(PROXY[i].port||53));
 					if(++i<PROXY.length){
 						proxy(req,res,name,i);
 					}else{
 						res.send(c_res);
-						console.warn("Not found",name,"on all proxies");
+						CONSOLE.warn("Not found",name,"on all proxies");
 					}
 				}
 			}catch(e){};
@@ -207,79 +215,138 @@ if(!findZone){
 		c_req.send(req);
 		
 		c_req.timeout  = setTimeout((function(name){
-			console.info("\tRequest",name,"Timeout on : ", PROXY[i].host+":"+(PROXY[i].port||53));
+			CONSOLE.info("\tRequest",name,"Timeout on : ", PROXY[i].host+":"+(PROXY[i].port||53));
 			//try{this.socket.close();}catch(e){};
 			if(++i<PROXY.length){
 				proxy(req,res,name,i);
 			}else{
 				res.send(res);
-				console.warn("Not found",name,"on all proxies");
+				CONSOLE.warn("Not found",name,"on all proxies");
 			}
 		}).bind(c_req,name),1500);
-		console.info("\tTry DNS ", PROXY[i].host+":"+(PROXY[i].port||53));
+		CONSOLE.info("\tTry DNS ", PROXY[i].host+":"+(PROXY[i].port||53));
 	};
-	var getRecords = function(data,name){
+	function str_replace(search, replace, subject/*, count*/){
+		var i = 0,
+        j = 0,
+        temp = '',
+        repl = '',
+        sl = 0,
+        fl = 0,
+        f = [].concat(search),
+        r = [].concat(replace),
+        s = subject,
+        ra = Object.prototype.toString.call(r) === '[object Array]',
+        sa = Object.prototype.toString.call(s) === '[object Array]';
+		s = [].concat(s);
+
+		for (i = 0, sl = s.length; i < sl; i++) {
+		    if (s[i] === '') {
+		        continue;
+		    }
+		    for (j = 0, fl = f.length; j < fl; j++) {
+		        temp = s[i] + '';
+		        repl = ra ? (r[j] !== undefined ? r[j] : '') : r[0];
+		        s[i] = (temp).split(f[j]).join(repl);
+		        
+		    }
+		}
+		return sa ? s : s[0];
+	}
+	var replaceWildChar = function(data,name,m){
+		return str_replace([
+			"{name}","$1","$2","$3","$4","$5","$6","$7","$8","$9"
+		],[
+			name,
+			m[1] || "",
+			m[2] || "",
+			m[3] || "",
+			m[4] || "",
+			m[5] || "",
+			m[6] || "",
+			m[7] || "",
+			m[8] || "",
+			m[9] || "",
+		],data);
+	}
+	var getRecords = function(typeName,data,name,m){
 		var ret = {
 			REP : [],
 			NS  : [],
 			ADD : []
 		};
+		m = m || [];
 		var i=0;
 		var j,k=0;
 		for(i in data){
-			j = String(data[i]).replace(/{name}/g,name);
 			switch(i.toLowerCase()){
 				case 'ip':
+					if(typeName != "a" && typeName != "any") break;
 					/* adresse IP */
 					data[i] = data[i] instanceof Array ? data[i] : [data[i]];
 					data[i].rotate(1);
 					for(var x=0; x< data[i].length;x++)
-						ret.REP.push([name,77, "IN", "A", data[i][x]]);
+						ret.REP.push([replaceWildChar(name,name,m),TTL.ip, "IN", "A",  replaceWildChar(data[i][x],name,m)]);
 					break;
 				case 'description':
-					ret.REP.push([name, 86400, "IN", "TXT", data[i]]);
+					if(typeName != "txt" && typeName != "any") break;
+					ret.REP.push([replaceWildChar(name,name,m), TTL.ttl, "IN", "TXT", replaceWildChar(data[i],name,m)]);
 					break;
 				case 'autority':
-					data[i] = String(j).split(',').slice(0,2);
+					if(typeName != "soa" && typeName != "any") break;
+					data[i] = String(data[i]).replace("@",".").replace(/[ ]+/,"").split(',').slice(0,2);
 					data[i] = data[i].length ==1 ? data[i].concat(data[i]) : data[i]; 
-					ret.REP.push([name, 86400, "IN", "SOA"].concat(data[i]).concat([UpdateConfFile,1800, 900, 604800, 86400]));
+					ret.REP.push([replaceWildChar(name,name,m), TTL.ttl, "IN", "SOA"]
+						.concat(replaceWildChar(data[i],name,m)).concat([UpdateConfFile,TTL.refresh, TTL.retry, TTL.ttlxpiration, TTL.ttl]));
 					break;
 				case 'mail':
+					if(typeName != "mx" && typeName != "spf" && typeName != "any") break;
 					data[i] = data[i] instanceof Array ? data[i] : [data[i]];
 					var k = 0;
-					for(j = 0;j< data[i].length;j++){
-						data[i].name = data[i][j].name? data[i].name.replace(/{name}/g,name) : "mail."+name;
-						ret.REP.push([name, 86400, "IN", "MX", data[i][j].priority || (++k)*10, data[i][j].name]);
-						if(data[i][j].ip){
-							data[i][j].ip = data[i][j].ip instanceof Array ? data[i][j].ip : [data[i][j].ip];
-							data[i][j].ip.rotate(1);
-							for(var x=0; x< data[i][j].ip.length;x++)
-								ret.ADD.push([data[i][j].name, 77, "IN", "A", data[i][j].ip[x]]);
+					if(typeName == "mx" || typeName == "any"){
+						data[i].rotate(1);
+						for(j = 0;j< data[i].length;j++){
+							data[i][j].name = data[i][j].name? data[i][j].name : "mail."+name;
+							ret.REP.push([replaceWildChar(name,name,m), TTL.ttl, "IN", "MX", data[i][j].priority || (++k)*5, replaceWildChar(data[i][j].name,name,m)]);
+							if(data[i][j].ip){
+								data[i][j].ip = data[i][j].ip instanceof Array ? data[i][j].ip : [data[i][j].ip];
+								data[i][j].ip.rotate(1);
+								for(var x=0; x< data[i][j].ip.length;x++)
+									ret.ADD.push([replaceWildChar(data[i][j].name,name,m), TTL.ip, "IN", "A", replaceWildChar(data[i][j].ip[x],name,m)]);
+							}
 						}
+					}
+					if(typeName == "spf" || typeName == "any"){
+						ret.REP.push([name, TTL.ttl, "IN", "SPF", SPF]);
+						ret.REP.push([name, TTL.ttl, "IN", "TXT", SPF]);
 					}
 					break;
 				case 'nameserver':
+					if(typeName != "ns" && typeName != "any") break;
+					data[i].rotate(1);
 					for(j = 0;j< data[i].length;j++){
-						data[i][j].name = data[i][j].name? data[i][j].name.replace(/{name}/g,name) : "ns"+(++k++)+"."+name;
-						ret.NS.push([name, 86400, "IN", "NS" , data[i][j].name]);
+						data[i][j].name = replaceWildChar(data[i][j].name? data[i][j].name : "ns"+(++k++)+"."+name,name,m);
+						ret.NS.push([replaceWildChar(name,name,m), TTL.ttl, "IN", "NS" , data[i][j].name]);
 						if(data[i][j].ip){
 							data[i][j].ip = data[i][j].ip instanceof Array ? data[i][j].ip : [data[i][j].ip];
 							data[i][j].ip.rotate(1);
 							for(var x=0; x< data[i][j].ip.length;x++)
-								ret.ADD.push([data[i][j].name, 77, "IN", "A", data[i][j].ip[x]]);
+								ret.ADD.push([data[i][j].name, TTL.ip, "IN", "A", replaceWildChar(data[i][j].ip[x],name,m)]);
 						};
 					}
 					break;
 				
 				case 'alias':
+					if(typeName != "cname" && typeName != "any") break;
+					data[i].rotate(1);
 					for(j = 0;j< data[i].length;j++){
-						data[i][j].name = data[i][j].name? data[i][j].name.replace(/{name}/g,name) : "ns"+(++k++)+"."+name;
-						ret.REP.push([name, 86400, "IN", "CNAME" , data[i][j].name]);
+						data[i][j].name = replaceWildChar(data[i][j].name? data[i][j].name : "ns"+(++k++)+"."+name,name,m);
+						ret.REP.push([replaceWildChar(name,name,m), TTL.ttl, "IN", "CNAME" , data[i][j].name]);
 						if(data[i][j].ip){
 							data[i][j].ip = data[i][j].ip instanceof Array ? data[i][j].ip : [data[i][j].ip];
 							data[i][j].ip.rotate(1);
 							for(var x=0; x< data[i][j].ip.length;x++)
-								ret.REP.push([data[i][j].name, 77, "IN", "A", data[i][j].ip[x]]);
+								ret.ADD.push([data[i][j].name, TTL.ip, "IN", "A", replaceWildChar(data[i][j].ip[x],name,m)]);
 						};
 					}
 					break;
@@ -293,34 +360,56 @@ if(!findZone){
 			if (name == ".")
 				name = "";
 			/* Test le nom */
-			//find info dns here
-			var rec;
-			if(NAMES && NAMES[name]){
-			    rec = getRecords(NAMES[name],name);
-			}else{
-				if(NAMES){
-			   		for(i in NAMES){
-				   		if(i.search(/\!/) != 0) continue;	
-				   		t = i
-				   			.replace("!","")
-                            .replace(/\./g,"\\.")
-                            .replace("*",".*")
-                            .replace("%w","[a-zA-Z0-9_]+")
-                            .replace("%d","[0-9]+")
-                            .replace("%h","[a-fA-F0-9]+");
-			   			t = new RegExp("^"+t+"$");
-			   			if(t.test(name)){
-			   				console.info("Found",t,"in",name);
-			   				rec = getRecords(NAMES[i],name);
-			   			}
-			   			t = '';
-			   		}
-			   	}
+			if(req.q[0].className.toLowerCase() == "in"){
+				//find info dns here
+				var rec;
+				if(NAMES && NAMES[name]){
+				    rec = getRecords(req.q[0].typeName.toLowerCase(),NAMES[name],name);
+				}else{
+					if(NAMES){
+				   		for(i in NAMES){
+					   		if(i.search(/\!/) != 0) continue;	
+					   		t = i
+					   			.replace("!","")
+	                            .replace(/\./g,"\\.")
+	                            .replace("*","(.*)")
+	                            .replace("%w","([a-zA-Z0-9_]+)")
+	                            .replace("%d","([0-9]+)")
+	                            .replace("%h","([a-fA-F0-9]+)");
+				   			t = new RegExp("^"+t+"$");
+				   			var m;
+				   			if(m = name.match(t)){
+				   				CONSOLE.info("Found",t,"in",name);
+				   				rec = getRecords(req.q[0].typeName.toLowerCase(),NAMES[i],name,m);
+				   				break;
+				   			}
+				   			t = '';
+				   		}
+				   	}
+				}
 			}
 			/* ** */
-			if(!rec){
-				console.warn("Not found",name,"on this server, try to use proxy");
+			if(!rec && PROXY.length){
+				CONSOLE.warn("Not found",name,"on this server, try to use proxy");
 				proxy(req,res,name);
+				return;
+			}else if(!rec){
+				res.setHeader(req.header);	
+				for (var i = 0; i < req.q.length; i++)
+					res.addQuestion(req.q[i]);
+			
+				res.header.qr = 1;
+				res.header.ra = 1;
+				res.header.rd = 0;
+				
+				/* Nombre de reponse */
+				//res.header.ancount = 0;
+				/* Nombre de namespace */
+				//res.header.nscount = 0;
+				/* Nombre de reponse aditionnel */
+				//res.header.arcount = 0;
+				res.send();
+				CONSOLE.warn("Not found",name,"on this server.");
 				return;
 			}
 			
@@ -340,15 +429,15 @@ if(!findZone){
 			res.header.arcount = rec.ADD.length;
 			/* ajout des reponses */
 			var j = 1;
-			for(var i=0;i<rec.REP.length;i++){
-				res.addRR.apply(res,rec.REP[i]);
-			}
-			
 			/* ajout des NS */
 			for(var i=0;i<rec.NS.length;i++){
 				res.addRR.apply(res,rec.NS[i]);
 			}
-			
+
+			for(var i=0;i<rec.REP.length;i++){
+				res.addRR.apply(res,rec.REP[i]);
+			}
+
 			/* ajout des ADD */
 			for(var i=0;i<rec.ADD.length;i++){
 				res.addRR.apply(res,rec.ADD[i]);
@@ -363,47 +452,55 @@ if(!findZone){
 	});
 	var loadConf = function(conf){
 		try{
-			console.info("LOAD Config Domain name");
+			CONSOLE.info("LOAD Config Domain name");
 			conf = JSON.parse(conf);
 			NAMES = conf;
-			console.info("\tConfig loaded");
+			CONSOLE.info("\tConfig loaded");
 		}catch(e){
-			console.error("\tError on decode Config",e.stack,"#",conf,"#");
+			CONSOLE.error("\tError on decode Config",e.stack,"#",conf,"#");
 		}
-		console.info("End LOAD Config");
+		CONSOLE.info("End LOAD Config");
 	}
 	/* function for load server */
 	var loadDataServer = function(serv,proxyOnly){
-		serv.nameserver = serv.nameserver.length ? serv.nameserver[0] : [];
+		serv.nameserver = serv.nameserver && serv.nameserver.length ? serv.nameserver[0] : [];
+		  
+		  serv.TTL = serv.ttl || TTL;
+		  TTL.ttl = serv.TTL.ttl || TTL.ttl;
+		  TTL.ip = serv.TTL.ip || TTL.ip;
+		  TTL.refresh = serv.TTL.refresh || TTL.refresh;
+		  TTL.retry = serv.TTL.retry || TTL.retry;
+		  TTL.expiration = serv.TTL.expiration || TTL.expiration;
+		  SPF = serv.spf || SPF;		  
 		  
 		  PROXY =  [];
-		  console.info("LOAD DNS Server");
+		  CONSOLE.info("LOAD DNS Server");
 		  for(i in serv.nameserver){
 		  	if(typeof serv.nameserver[i] == "string"){
-		  		console.info("\tADD DNS Server",serv.nameserver[i]);
+		  		CONSOLE.info("\tADD DNS Server",serv.nameserver[i]);
 			  	PROXY.push(parseUrl(String(serv.nameserver[i])));
 			}
 		  }
 		  if(PROXY.length)
-		  	console.info(PROXY.length+" DNS Server added");
+		  	CONSOLE.info(PROXY.length+" DNS Server added");
 		  else
-		  	console.info("No DNS Server to add");
+		  	CONSOLE.info("No DNS Server to add");
 		  if(Boolean(proxyOnly))return;
 		  /*define config page*/
 		  conf = options.conf || serv.conf || "app://config/conf.json";
 		  conf = appProtocol(conf);
 		  fs.readFile(conf, function (err, data) {
 			  if (err){
-			  	console.error('Fatal Error : Can\'t read Config at ' + conf );
+			  	CONSOLE.error('Fatal Error : Can\'t read Config at ' + conf );
 			  	process.exit(1);
 			  };
 			
-			  UpdateConfFile = fs.statSync(conf).mtime.format("Ymd11");
+			  UpdateConfFile = fs.statSync(conf).mtime.format("Ymd"+(Math.floor(Math.random()*99+10)));
 			  loadConf(String(data));
 			  fs.watchFile(conf, function (curr, prev) {
 					fs.readFile(conf, function (err, data) {
 						if (err){
-						  	console.error('Can\'t read Config at ' + conf );
+						  	CONSOLE.error('Can\'t read Config at ' + conf );
 						  	return;
 						  };
 						loadConf(String(data));
@@ -417,10 +514,10 @@ if(!findZone){
 			  serv.port = Number(serv.port);
 			  if(serv.host && serv.host != 0){
 				  server.bind(serv.port, serv.host);
-				  console.info('Started server on ' + serv.host + ':' + serv.port);
+				  CONSOLE.info('Started server on ' + serv.host + ':' + serv.port);
 			  }else{
 			  	server.bind(serv.port);
-			  	console.info('Started server on *:' + serv.port);
+			  	CONSOLE.info('Started server on *:' + serv.port);
 			  }
 			});
 		  /* ** */
@@ -431,14 +528,14 @@ if(!findZone){
 	servConfig = appProtocol(servConfig);
 	fs.readFile(servConfig, function (err, data) {
 	  if (err){
-	  	console.error('Fatal Error : Can\'t read Config server at ' + servConfig );
+	  	CONSOLE.error('Fatal Error : Can\'t read Config server at ' + servConfig );
 	  	process.exit(1);
 	  };
 	  loadDataServer(ini.parseString(String(data),true));
 	  fs.watchFile(servConfig, function (curr, prev) {
 			fs.readFile(servConfig, function (err, data) {
 				if (err){
-				  	console.error('Can\'t read Config server at ' + servConfig );
+				  	CONSOLE.error('Can\'t read Config server at ' + servConfig );
 				  	return;
 				  };
 				loadDataServer(ini.parseString(String(data),true),true);
@@ -448,17 +545,17 @@ if(!findZone){
 };
 
 process.on('uncaughtException', function (err) {
-  console.error("Erreur",":", err.code || err.stack || err);
+  CONSOLE.error("Erreur",":", err.code || err.stack || err);
   if(err.code){
   	switch(err.code){
   		case 'EADDRNOTAVAIL':
-  			console.error("\tL'adresse n'est pas disponible!");
+  			CONSOLE.error("\tL'adresse n'est pas disponible!");
   			break;
   		case 'EADDRINUSE':
-  			console.error("\tLe port est deja utilise!");
+  			CONSOLE.error("\tLe port est deja utilise!");
   			break;
   		case 'EACCES':
-  			console.error("\tVerifier vos droits!");
+  			CONSOLE.error("\tVerifier vos droits!");
   			break;
   	}
   	process.exit();
