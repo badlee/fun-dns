@@ -4,7 +4,7 @@
  _  | | | | | | \___  \   | |        |  __|  | | | | |  _  /       |  __|  | | | | | |\   | 
 | |_| | | |_| |  ___| |   | |        | |     | |_| | | | \ \       | |     | |_| | | | \  | 
 \_____/ \_____/ /_____/   |_|        |_|     \_____/ |_|  \_\      |_|     \_____/ |_|  \_| 
-                                                                             version 0.1.11
+                                                                             version 0.1.12
 
 Fun DNS build on top of Nodejs
 
@@ -42,7 +42,7 @@ How define hostname
 		"name" : {
 			"ip" : "127.0.0.1",
 			"description" : "je suis le serveur web local",
-			"autority" : "dns.{name},dns2.{name}",
+			"autority" : "dns.{name},admin@{name}",
 			"mail" : {
 				"ip" : "127.0.0.2",
 				"name" : "mail.{name}",
@@ -75,7 +75,7 @@ How define hostname
 			},
 			"!*.lo" : {
 				"ip" : "127.0.0.1",
-				"autority" : "dns.{name},dns2.{name}",
+				"autority" : "dns.{name},admin@{name}",
 		
 				"nameserver" : [{
 					"ip" : "127.0.0.1",
@@ -103,9 +103,13 @@ Server confiurations(config/serv.ini)
 		conf = app://config/lab.json
 		port = 53
 		host = 192.168.1.1
+		spf  = "v=spf1 +all"
+		[ttl]
+		    ttl = 600
+		    ip  = 77
 		[nameserver]
-		google.dns.a = 8.8.8.8
-		google.dns.b = 8.8.4.4
+		    google.dns.a = 8.8.8.8
+		    google.dns.b = 8.8.4.4
 
 
 
