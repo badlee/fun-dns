@@ -6,19 +6,20 @@
 |_____/ |_|  \_| /_____/   |_|     \_____/ |_|  \_\   |_|     \_____/ |_|  \_| 
                                                                 version 0.1.12
 
-Fun DNS build on top of Nodejs
+Fun DNS server  build on top of Nodejs
 
 How install
 	Run $ sudo setup.sh
 OR
+	$ wget -O /tmp/fun_dns.v0.1.12.tar.gz https://github.com/downloads/badlee/fun-dns/fun_dns.v0.1.12.tar.gz
 	$ sudo -s 
 	$ mkdir /opt/fun_dns
 	$ cd /opt/fun_dns
-	$ tar xvf /path/to/fun_dns.tar.gz
+	$ tar xvf /tmp/fun_dns.tar.gz
 	$ ln -s /opt/fun_dns/fun_dns.daemon /etc/init.d/fun_dns
 	$ update-rc.d fun_dns defaults
 	$ #Start service
-	$ service fun_dns start	
+	$ service fun_dns start
 
 How define hostname
 	edit 'config/conf.json',
@@ -93,11 +94,18 @@ Server confiurations(config/serv.ini)
 	host = your ip4 addresse to listen(if not defined listen all)
 	port = port to listen(if not defined listen 53)
 	Section nameserver = list of dns server used to found response when no response found on server(as a proxy, but it's eprouve the global performances)
-		[nameserver] 
+	[nameserver] 
 		nameOfTheDnsServer1 = Ip_Address
 		nameOfTheDnsServer2 = Ip_Address
 		...
 		nameOfTheDnsServer3 = Ip_Address
+	Section ttl = list of ttl in dns reponse (in secondes)
+	[ttl]
+		ip  = ttl for any ip (A or AAAA) address (if not defined 77)
+		ttl = ttl for any field different of ip (A or AAAA) (if not defined 600)
+		refresh = time to refresh the zone (if not defined 1800)
+		retry   = time to retry when refresh (above) has expired (if not defined 900)
+		expiration = ttl for DNS response (if not defined 604800)
 
 	sample serv.ini:
 		conf = app://config/lab.json
@@ -131,5 +139,3 @@ Command line option
 			Lookup a zoneWalk
 	---	-l|--log <value>  
 			path to log file
-
-
