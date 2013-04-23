@@ -11,7 +11,7 @@ Fun DNS server  build on top of Nodejs
 How install
 	Run $ sudo setup.sh
 OR
-	$ wget -O /tmp/fun_dns.v0.1.12.tar.gz https://github.com/downloads/badlee/fun-dns/fun_dns.v0.1.12.tar.gz
+	$ wget -O /tmp/fun_dns.tar.gz https://github.com/downloads/badlee/fun-dns/fun_dns.v0.1.12.tar.gz
 	$ sudo -s 
 	$ mkdir /opt/fun_dns
 	$ cd /opt/fun_dns
