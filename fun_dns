@@ -43,6 +43,7 @@ var sys = require('util'),
 	ini = require('parser.js'),
 	ndns = require('ndns.js'),
 	uri = require('url'),
+	pcode = require('punycode'),
 	fs = require('fs');
 CONSOLE = require('console.js');
 require('_extend.js');
@@ -356,7 +357,7 @@ if(!findZone){
 	};
 	server.on("request", function(req, res) {
 		if (req.q.length > 0) {
-			var name = req.q[0].name.toLowerCase(); // domain name is case insensitive
+			var name = pcode.toASCII(pcode.toUnicode(req.q[0].name).toLowerCase()); // domain name is case insensitive
 			if (name == ".")
 				name = "";
 			/* Test le nom */
