@@ -356,7 +356,7 @@ if(!findZone){
 	};
 	server.on("request", function(req, res) {
 		if (req.q.length > 0) {
-			var name = req.q[0].name;
+			var name = req.q[0].name.toLowerCase(); // domain name is case insensitive
 			if (name == ".")
 				name = "";
 			/* Test le nom */
