@@ -357,15 +357,17 @@ if(!findZone){
 	};
 	server.on("request", function(req, res) {
 		if (req.q.length > 0) {
-			var name = pcode.toASCII(pcode.toUnicode(req.q[0].name).toLowerCase()); // domain name is case insensitive
+			var name = req.q[0].name;
+			var uname = pcode.toUnicode(name).toLowerCase(); // domain name is case insensitive
 			if (name == ".")
 				name = "";
 			/* Test le nom */
 			if(req.q[0].className.toLowerCase() == "in"){
 				//find info dns here
 				var rec;
-				if(NAMES && NAMES[name]){
-				    rec = getRecords(req.q[0].typeName.toLowerCase(),NAMES[name],name);
+				if(NAMES && NAMES.hasOwnProperty(uname)){
+				    rec = getRecords(req.q[0].typeName.toLowerCase(),NAMES[uname],name);
+				    CONSOLE.info('Found', uname);
 				}else{
 					if(NAMES){
 				   		for(i in NAMES){
@@ -379,8 +381,8 @@ if(!findZone){
 	                            .replace("%h","([a-fA-F0-9]+)");
 				   			t = new RegExp("^"+t+"$");
 				   			var m;
-				   			if(m = name.match(t)){
-				   				CONSOLE.info("Found",t,"in",name);
+				   			if(m = uname.match(t)){
+				   				CONSOLE.info("Found",t,"in",uname);
 				   				rec = getRecords(req.q[0].typeName.toLowerCase(),NAMES[i],name,m);
 				   				break;
 				   			}
@@ -455,6 +457,15 @@ if(!findZone){
 		try{
 			CONSOLE.info("LOAD Config Domain name");
 			conf = JSON.parse(conf);
+			for(var i in conf){
+				if(!conf.hasOwnProperty(i)) continue;
+				var i1 = i.toLowerCase();
+				if(i != i1){
+					if(conf[i1]) { CONSOLE.warn("Multiple declaration of", i1); continue; }
+					conf[i1] = conf[i];
+					delete conf[i];
+				}
+			}
 			NAMES = conf;
 			CONSOLE.info("\tConfig loaded");
 		}catch(e){
