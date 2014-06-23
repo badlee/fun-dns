@@ -45,6 +45,7 @@ var sys = require('util'),
 	uri = require('url'),
 	pcode = require('punycode'),
 	fs = require('fs');
+
 CONSOLE = require('console.js');
 require('_extend.js');
 function appProtocol(a,dir){
@@ -180,7 +181,7 @@ if(!findZone){
 			res.rr = CACHE_DNS[name].rr;
 			
 			res.send();
-			CONSOLE.info(req.remoteAdrr(),"Found",name,"on Cache data");
+			CONSOLE.info("Found",name,"on Cache data");
 			return;
 		};
 		i = i || 0;
@@ -198,14 +199,15 @@ if(!findZone){
 				if((c_res.header.ancount+c_res.header.nscount+c_res.header.arcount)){
 					res.send(c_res);
 					CONSOLE.info("Found",name,"on", PROXY[i].host+":"+(PROXY[i].port||53));
+					
 					CACHE_DNS[name] = c_res;
 					setTimeout((function(name){
 						CACHE_DNS[name]=false;
-					}).bind(null,name),1000*60*60*60);
+					}).bind(null,name+'('+req.q[0].typeName+')'),1000*60*60*60);
 				}else{
 					CONSOLE.info("\tNot Found", name ," on this DNS : ", PROXY[i].host+":"+(PROXY[i].port||53));
 					if(++i<PROXY.length){
-						proxy(req,res,name,i);
+						proxy(req,res,name+'('+req.q[0].typeName+')',i);
 					}else{
 						res.send(c_res);
 						CONSOLE.warn("Not found",name,"on all proxies");
@@ -224,7 +226,7 @@ if(!findZone){
 				res.send(res);
 				CONSOLE.warn("Not found",name,"on all proxies");
 			}
-		}).bind(c_req,name),1500);
+		}).bind(c_req,name+'('+req.q[0].typeName+')'),1500);
 		CONSOLE.info("\tTry DNS ", PROXY[i].host+":"+(PROXY[i].port||53));
 	};
 	function str_replace(search, replace, subject/*, count*/){
@@ -394,7 +396,7 @@ if(!findZone){
 			/* ** */
 			if(!rec && PROXY.length){
 				CONSOLE.warn("Not found",name,"on this server, try to use proxy");
-				proxy(req,res,name);
+				proxy(req,res,name+'('+req.q[0].typeName+')');
 				return;
 			}else if(!rec){
 				res.setHeader(req.header);	
